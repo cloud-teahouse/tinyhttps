@@ -30,6 +30,16 @@ jobs:
       - name: Install workspace tools (.xlings.json)
         run: xlings install -y
 
+      # Cache mcpp's self-bootstrapped sandbox: musl-gcc + binutils +
+      # glibc + ninja + patchelf, plus the cloned mcpp-index. ~800 MB
+      # one-time download — reused across runs since mcpp 0.0.3's
+      # toolchain set is version-pinned.
+      - name: Cache mcpp sandbox
+        uses: actions/cache@v4
+        with:
+          path: ~/.xlings/data/xpkgs/xim-x-mcpp/0.0.3/registry
+          key: mcpp-sandbox-${{ runner.os }}-mcpp0.0.3
+
       - name: Build with mcpp
         run: mcpp build
 
