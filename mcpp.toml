@@ -1,0 +1,27 @@
+[package]
+name        = "mcpplibs.tinyhttps"
+version     = "0.2.0"
+description = "Minimal C++23 HTTP/HTTPS client with SSE streaming support"
+license     = "Apache-2.0"
+repo        = "https://github.com/mcpplibs/tinyhttps"
+
+[language]
+standard   = "c++23"
+modules    = true
+import_std = true
+
+[modules]
+sources = ["src/**/*.cppm"]
+exports = ["mcpplibs.tinyhttps"]
+
+[targets.tinyhttps]
+kind = "lib"
+
+# mbedtls is the only runtime dep. xmake.lua used `add_packages("mbedtls", { public = true })`;
+# the mcpp build picks up mbedtls's headers + libmbedtls.a transparently.
+[dependencies]
+mbedtls = "3.6.1"
+
+# `mcpp test` resolves these and discovers tests/**/*.cpp automatically.
+[dev-dependencies]
+gtest = "1.15.2"
