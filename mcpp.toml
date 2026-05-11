@@ -9,8 +9,8 @@ repo        = "https://github.com/mcpplibs/tinyhttps"
 [targets.tinyhttps]
 kind = "lib"
 
-[dependencies]
+[dependencies.compat]
 mbedtls = "3.6.1"
 
-[dev-dependencies]
+[dev-dependencies.compat]
 gtest = "1.15.2"
