@@ -28,6 +28,34 @@ auto resp = client.send(mcpplibs::tinyhttps::HttpRequest::post(
 ));
 ```
 
+## 使用 mcpp 构建
+
+### 添加依赖
+
+```bash
+mcpp add tinyhttps@0.2.2
+```
+
+或在 `mcpp.toml` 中手动添加：
+
+```toml
+[dependencies]
+tinyhttps = "0.2.2"
+```
+
+### 构建
+
+```bash
+mcpp build
+```
+
+### 代码示例
+
+```cpp
+import mcpplibs.tinyhttps;
+// ... usage example
+```
+
 ## License
 
 Apache-2.0

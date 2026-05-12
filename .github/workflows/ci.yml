@@ -25,20 +25,20 @@ jobs:
           "/tmp/xlings-${XLINGS_VERSION}-linux-x86_64/subos/default/bin/xlings" self install
           echo "$HOME/.xlings/subos/current/bin" >> "$GITHUB_PATH"
 
-      # Resolves `.xlings.json` → installs mcpp@0.0.3 (and any other
+      # Resolves `.xlings.json` → installs mcpp (and any other
       # workspace tools listed). Idempotent on cache hits.
       - name: Install workspace tools (.xlings.json)
         run: xlings install -y
 
       # Cache mcpp's self-bootstrapped sandbox: musl-gcc + binutils +
       # glibc + ninja + patchelf, plus the cloned mcpp-index. ~800 MB
-      # one-time download — reused across runs since mcpp 0.0.8's
+      # one-time download — reused across runs since mcpp 0.0.11's
       # toolchain set is version-pinned.
       - name: Cache mcpp sandbox
         uses: actions/cache@v4
         with:
-          path: ~/.xlings/data/xpkgs/xim-x-mcpp/0.0.8/registry
-          key: mcpp-sandbox-${{ runner.os }}-mcpp0.0.8
+          path: ~/.xlings/data/xpkgs/xim-x-mcpp/0.0.11/registry
+          key: mcpp-sandbox-${{ runner.os }}-mcpp0.0.11
 
       - name: Build with mcpp
         run: mcpp build
