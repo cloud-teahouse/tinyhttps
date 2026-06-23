@@ -98,9 +98,12 @@ public:
                 // in well under a second. Cap it hard (independent of the much
                 // larger connect timeout) so an intermittently-dropped packet to
                 // 8.8.8.8 can't stall a connect for tens of seconds per host.
+                // Plain ternary, not std::min: <winsock2.h> defines a `min`
+                // macro that would mangle std::min on the (compiled-but-discarded)
+                // Windows branch of this if constexpr.
                 constexpr int kDnsTimeoutMs = 2500;
-                int dnsTimeout = timeoutMs > 0 ? std::min(timeoutMs, kDnsTimeoutMs)
-                                               : kDnsTimeoutMs;
+                int dnsTimeout = (timeoutMs > 0 && timeoutMs < kDnsTimeoutMs)
+                                     ? timeoutMs : kDnsTimeoutMs;
                 for (const auto& ip : platform::resolve_fallback(host, dnsTimeout)) {
                     if (try_resolved(ip.c_str(), /*numeric=*/true)) return true;
                 }
