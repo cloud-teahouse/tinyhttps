@@ -94,7 +94,13 @@ public:
             // Fall back to a manual DNS query when libc can't resolve (Termux:
             // nameservers live in $PREFIX/etc/resolv.conf, which libc ignores).
             auto try_manual = [&]() -> bool {
-                int dnsTimeout = timeoutMs > 0 ? timeoutMs : 5000;
+                // DNS must be snappy: a UDP query to a working resolver answers
+                // in well under a second. Cap it hard (independent of the much
+                // larger connect timeout) so an intermittently-dropped packet to
+                // 8.8.8.8 can't stall a connect for tens of seconds per host.
+                constexpr int kDnsTimeoutMs = 2500;
+                int dnsTimeout = timeoutMs > 0 ? std::min(timeoutMs, kDnsTimeoutMs)
+                                               : kDnsTimeoutMs;
                 for (const auto& ip : platform::resolve_fallback(host, dnsTimeout)) {
                     if (try_resolved(ip.c_str(), /*numeric=*/true)) return true;
                 }

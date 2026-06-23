@@ -185,9 +185,25 @@ export std::vector<std::string> resolve_fallback([[maybe_unused]] const char* ho
     return {};
 #else
     if (is_numeric_host(host)) return { std::string(host) };
+
+    // Process-wide cache of successful resolutions. A single download performs
+    // several connects to the same host (HEAD probe, GET, redirect targets); on
+    // Termux each would otherwise re-run a UDP query to 8.8.8.8, and one dropped
+    // packet stalls the whole transfer. Cache once, reuse for the process.
+    static std::mutex cache_mutex;
+    static std::map<std::string, std::vector<std::string>> cache;
+    {
+        std::lock_guard<std::mutex> lock(cache_mutex);
+        if (auto it = cache.find(host); it != cache.end()) return it->second;
+    }
+
     for (const auto& ns : resolv_nameservers()) {
         auto got = dns_query_a(ns, host, timeoutMs);
-        if (!got.empty()) return got;
+        if (!got.empty()) {
+            std::lock_guard<std::mutex> lock(cache_mutex);
+            cache.emplace(std::string(host), got);
+            return got;
+        }
     }
     return {};
 #endif
