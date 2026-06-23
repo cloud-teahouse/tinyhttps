@@ -160,13 +160,19 @@ inline std::vector<std::string> dns_query_a(const std::string& server, const cha
 // True when libc's own resolver has a usable config (/etc/resolv.conf). When
 // false, callers should prefer resolve_fallback() to avoid a multi-second stall
 // on a dead 127.0.0.1:53. Always true on Windows (the OS resolver is reliable).
+//
+// Note: the bodies branch with #ifdef, not `if constexpr` — a non-template
+// `if constexpr` still compiles its discarded branch, which would reference the
+// POSIX-only helpers above that don't exist on Windows. Concentrating that
+// preprocessor divergence here is exactly why this platform module exists; call
+// sites elsewhere branch on `is_windows` with `if constexpr`.
 export bool system_resolver_configured() {
-    if constexpr (is_windows) {
-        return true;
-    } else {
-        std::error_code ec;
-        return std::filesystem::exists("/etc/resolv.conf", ec);
-    }
+#ifdef _WIN32
+    return true;
+#else
+    std::error_code ec;
+    return std::filesystem::exists("/etc/resolv.conf", ec);
+#endif
 }
 
 // Resolve a hostname to IPv4 literals WITHOUT relying on libc's resolver, by
@@ -175,16 +181,16 @@ export bool system_resolver_configured() {
 // on query failure. A numeric host is returned unchanged.
 export std::vector<std::string> resolve_fallback([[maybe_unused]] const char* host,
                                                  [[maybe_unused]] int timeoutMs) {
-    if constexpr (is_windows) {
-        return {};
-    } else {
-        if (is_numeric_host(host)) return { std::string(host) };
-        for (const auto& ns : resolv_nameservers()) {
-            auto got = dns_query_a(ns, host, timeoutMs);
-            if (!got.empty()) return got;
-        }
-        return {};
+#ifdef _WIN32
+    return {};
+#else
+    if (is_numeric_host(host)) return { std::string(host) };
+    for (const auto& ns : resolv_nameservers()) {
+        auto got = dns_query_a(ns, host, timeoutMs);
+        if (!got.empty()) return got;
     }
+    return {};
+#endif
 }
 
 } // namespace mcpplibs::tinyhttps::platform
