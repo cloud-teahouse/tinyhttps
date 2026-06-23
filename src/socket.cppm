@@ -17,6 +17,7 @@ module;
 export module mcpplibs.tinyhttps:socket;
 
 import std;
+import :platform;
 
 namespace mcpplibs::tinyhttps {
 
@@ -66,20 +67,51 @@ public:
             close();
         }
 
-        // Resolve address
-        struct addrinfo hints{};
-        hints.ai_family = AF_UNSPEC;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_protocol = IPPROTO_TCP;
-
         auto portStr = std::to_string(port);
-        struct addrinfo* result = nullptr;
-        int rc = ::getaddrinfo(host, portStr.c_str(), &hints, &result);
-        if (rc != 0 || result == nullptr) {
-            return false;
-        }
 
-        // Try each address
+        // Resolve via the system resolver (getaddrinfo). On Termux/Android a
+        // musl-static build can't — its nameservers live in $PREFIX/etc/resolv.conf
+        // which libc never reads — so fall back to a manual DNS query there.
+        auto try_resolved = [&](const char* node, bool numeric) -> bool {
+            struct addrinfo hints{};
+            hints.ai_family = AF_UNSPEC;
+            hints.ai_socktype = SOCK_STREAM;
+            hints.ai_protocol = IPPROTO_TCP;
+            if (numeric) hints.ai_flags = AI_NUMERICHOST;
+
+            struct addrinfo* result = nullptr;
+            if (::getaddrinfo(node, portStr.c_str(), &hints, &result) != 0 || result == nullptr) {
+                return false;
+            }
+            bool ok = connect_addrinfo(result, timeoutMs);
+            ::freeaddrinfo(result);
+            return ok;
+        };
+
+        if constexpr (platform::is_windows) {
+            return try_resolved(host, /*numeric=*/false);
+        } else {
+            // Fall back to a manual DNS query when libc can't resolve (Termux:
+            // nameservers live in $PREFIX/etc/resolv.conf, which libc ignores).
+            auto try_manual = [&]() -> bool {
+                int dnsTimeout = timeoutMs > 0 ? timeoutMs : 5000;
+                for (const auto& ip : platform::resolve_fallback(host, dnsTimeout)) {
+                    if (try_resolved(ip.c_str(), /*numeric=*/true)) return true;
+                }
+                return false;
+            };
+
+            // No libc resolver config but a relocatable one exists → resolve
+            // manually first to avoid a multi-second stall on a dead 127.0.0.1:53.
+            if (!platform::system_resolver_configured()) {
+                return try_manual() || try_resolved(host, /*numeric=*/false);
+            }
+            return try_resolved(host, /*numeric=*/false) || try_manual();
+        }
+    }
+
+    // Connect to the first reachable address in a resolved list.
+    bool connect_addrinfo(struct addrinfo* result, int timeoutMs) {
         for (auto* rp = result; rp != nullptr; rp = rp->ai_next) {
             SocketHandle fd = ::socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
             if (fd == INVALID_SOCKET_FD) {
@@ -92,7 +124,7 @@ public:
                 continue;
             }
 
-            rc = ::connect(fd, rp->ai_addr, static_cast<int>(rp->ai_addrlen));
+            int rc = ::connect(fd, rp->ai_addr, static_cast<int>(rp->ai_addrlen));
 
             bool connected = false;
             if (rc == 0) {
@@ -118,14 +150,12 @@ public:
                 // Restore blocking mode
                 set_non_blocking(fd, false);
                 fd_ = fd;
-                ::freeaddrinfo(result);
                 return true;
             }
 
             close_handle(fd);
         }
 
-        ::freeaddrinfo(result);
         return false;
     }
 
